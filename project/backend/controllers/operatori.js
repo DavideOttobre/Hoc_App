@@ -1,11 +1,13 @@
 import { prisma } from '../server.js';
 import { z } from 'zod';
+import bcrypt from 'bcrypt';
 
 // Schema di validazione per la creazione/aggiornamento di un operatore
 const operatoreSchema = z.object({
   nome: z.string().min(1, { message: 'Il nome è obbligatorio' }),
   cognome: z.string().min(1, { message: 'Il cognome è obbligatorio' }),
-  email: z.string().email({ message: 'Email non valida' })
+  email: z.string().email({ message: 'Email non valida' }),
+  password: z.string().min(6, { message: 'La password deve contenere almeno 6 caratteri' }).optional()
 });
 
 /**
@@ -83,9 +85,37 @@ export const createOperatore = async (req, res) => {
     // Validazione input
     const validatedData = operatoreSchema.parse(req.body);
     
+    // Genera una password casuale se non fornita
+    const password = validatedData.password || Math.random().toString(36).slice(-8);
+    
+    // Verifica se l'email è già in uso nella tabella users
+    const existingUser = await prisma.user.findUnique({
+      where: { email: validatedData.email }
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email già in uso' });
+    }
+    
+    // Hash della password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Crea il nuovo utente per l'accesso
+    const newUser = await prisma.user.create({
+      data: {
+        email: validatedData.email,
+        password: hashedPassword,
+        role: 'OPERATORE'
+      }
+    });
+    
     // Crea il nuovo operatore
     const newOperatore = await prisma.operatore.create({
-      data: validatedData
+      data: {
+        nome: validatedData.nome,
+        cognome: validatedData.cognome,
+        email: validatedData.email
+      }
     });
     
     // Se l'utente è un responsabile, crea anche la relazione
@@ -98,7 +128,14 @@ export const createOperatore = async (req, res) => {
       });
     }
     
-    res.status(201).json(newOperatore);
+    // Restituisci i dati dell'operatore e la password generata (se non fornita)
+    const response = {
+      ...newOperatore,
+      userId: newUser.id,
+      generatedPassword: validatedData.password ? undefined : password
+    };
+    
+    res.status(201).json(response);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: 'Dati non validi', errors: error.errors });

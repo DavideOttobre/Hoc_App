@@ -27,6 +27,7 @@ export default function EmployeeForm({ type, employee, onClose, onSuccess }: Emp
   const [nome, setNome] = useState(employee?.nome || '');
   const [cognome, setCognome] = useState(employee?.cognome || '');
   const [email, setEmail] = useState(employee?.email || '');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,7 +38,8 @@ export default function EmployeeForm({ type, employee, onClose, onSuccess }: Emp
       const employeeData = {
         nome,
         cognome,
-        email
+        email,
+        password: password || undefined // Invia la password solo se è stata inserita
       };
 
       if (employee) {
@@ -51,13 +53,26 @@ export default function EmployeeForm({ type, employee, onClose, onSuccess }: Emp
         toast.success('Dipendente aggiornato con successo');
       } else {
         // Creazione nuovo dipendente
+        let response;
         if (type === 'responsabili') {
-          await responsabiliAPI.create(employeeData);
+          response = await responsabiliAPI.create(employeeData);
         } else {
-          await operatoriAPI.create(employeeData);
+          response = await operatoriAPI.create(employeeData);
         }
         
-        toast.success('Dipendente creato con successo');
+        // Mostra la password generata se presente
+        if (response.generatedPassword) {
+          toast.success(
+            <div>
+              <p>Dipendente creato con successo</p>
+              <p className="font-bold mt-2">Password generata: {response.generatedPassword}</p>
+              <p className="text-xs mt-1">Conserva questa password, non sarà più visibile in seguito.</p>
+            </div>,
+            { duration: 10000 } // Mostra il toast per 10 secondi
+          );
+        } else {
+          toast.success('Dipendente creato con successo');
+        }
       }
       
       onSuccess();
@@ -128,6 +143,25 @@ export default function EmployeeForm({ type, employee, onClose, onSuccess }: Emp
               required
             />
           </div>
+          
+          {!employee && (
+            <div>
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+                Password (opzionale)
+              </label>
+              <input
+                type="password"
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+                placeholder="Lascia vuoto per generare una password casuale"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Se non inserisci una password, ne verrà generata una automaticamente.
+              </p>
+            </div>
+          )}
           
           <div className="flex justify-end space-x-3">
             <button

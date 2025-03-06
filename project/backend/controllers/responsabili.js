@@ -1,11 +1,13 @@
 import { prisma } from '../server.js';
 import { z } from 'zod';
+import bcrypt from 'bcrypt';
 
 // Schema di validazione per la creazione/aggiornamento di un responsabile
 const responsabileSchema = z.object({
   nome: z.string().min(1, { message: 'Il nome è obbligatorio' }),
   cognome: z.string().min(1, { message: 'Il cognome è obbligatorio' }),
-  email: z.string().email({ message: 'Email non valida' })
+  email: z.string().email({ message: 'Email non valida' }),
+  password: z.string().min(6, { message: 'La password deve contenere almeno 6 caratteri' }).optional()
 });
 
 /**
@@ -72,12 +74,47 @@ export const createResponsabile = async (req, res) => {
     // Validazione input
     const validatedData = responsabileSchema.parse(req.body);
     
-    // Crea il nuovo responsabile
-    const newResponsabile = await prisma.responsabile.create({
-      data: validatedData
+    // Genera una password casuale se non fornita
+    const password = validatedData.password || Math.random().toString(36).slice(-8);
+    
+    // Verifica se l'email è già in uso nella tabella users
+    const existingUser = await prisma.user.findUnique({
+      where: { email: validatedData.email }
     });
     
-    res.status(201).json(newResponsabile);
+    if (existingUser) {
+      return res.status(400).json({ message: 'Email già in uso' });
+    }
+    
+    // Hash della password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Crea il nuovo utente per l'accesso
+    const newUser = await prisma.user.create({
+      data: {
+        email: validatedData.email,
+        password: hashedPassword,
+        role: 'RESPONSABILE'
+      }
+    });
+    
+    // Crea il nuovo responsabile
+    const newResponsabile = await prisma.responsabile.create({
+      data: {
+        nome: validatedData.nome,
+        cognome: validatedData.cognome,
+        email: validatedData.email
+      }
+    });
+    
+    // Restituisci i dati del responsabile e la password generata (se non fornita)
+    const response = {
+      ...newResponsabile,
+      userId: newUser.id,
+      generatedPassword: validatedData.password ? undefined : password
+    };
+    
+    res.status(201).json(response);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: 'Dati non validi', errors: error.errors });
