@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(OPERATORE)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Creator {
+  id           String         @id @default(uuid())
+  nome         String
+  cognome      String
+  createdAt    DateTime       @default(now()) @map("created_at")
+  disponibilita Disponibilita[]
+
+  @@map("Creator")
+}
+
+model Operatore {
+  id                    String                  @id @default(uuid())
+  nome                  String
+  cognome               String
+  email                 String
+  createdAt             DateTime                @default(now()) @map("created_at")
+  responsabiliOperatori ResponsabiliOperatori[]
+  disponibilita         Disponibilita[]
+  richieste             Richiesta[]
+
+  @@map("Operatori")
+}
+
+model Responsabile {
+  id                    String                  @id @default(uuid())
+  nome                  String
+  cognome               String
+  email                 String
+  createdAt             DateTime                @default(now()) @map("created_at")
+  responsabiliOperatori ResponsabiliOperatori[]
+
+  @@map("Responsabili")
+}
+
+model ResponsabiliOperatori {
+  id              String       @id @default(uuid())
+  idOperatore     String       @map("id_operatore")
+  idResponsabile  String       @map("id_responsabile")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  operatore       Operatore    @relation(fields: [idOperatore], references: [id], onDelete: Cascade)
+  responsabile    Responsabile @relation(fields: [idResponsabile], references: [id], onDelete: Cascade)
+
+  @@map("responsabili_operatori")
+}
+
+model Disponibilita {
+  id                     String              @id @default(uuid())
+  dataPrenotazione       String              @map("data_prenotazione")
+  dataDisponibilita      String              @map("data_disponibilita")
+  fascia0307             String              @map("fascia_03_07")
+  fascia0712             String              @map("fascia_07_12")
+  fascia1217             String              @map("fascia_12_17")
+  fascia1722             String              @map("fascia_17_22")
+  fascia2203             String              @map("fascia_22_03")
+  idOperatoreResponsabile String              @map("id_operatore_responsabile")
+  idCreator              String              @map("id_creator")
+  createdAt              DateTime            @default(now()) @map("created_at")
+  operatore              Operatore           @relation(fields: [idOperatoreResponsabile], references: [id], onDelete: Cascade)
+  creator                Creator             @relation(fields: [idCreator], references: [id], onDelete: Cascade)
+  incassiPerTurni        IncassoPerTurno[]
+
+  @@map("disponibilita")
+}
+
+model IncassoPerTurno {
+  id              String       @id @default(uuid())
+  incasso         Float
+  idDisponibilita String       @map("id_disponibilita")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  disponibilita   Disponibilita @relation(fields: [idDisponibilita], references: [id], onDelete: Cascade)
+
+  @@map("incassi_per_turni")
+}
+
+model Utente {
+  id             String       @id @default(uuid())
+  nicknameUtente String       @map("nickname_utente")
+  idUnivocoOf    String       @map("id_univoco_of")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  noteUtente     NotaUtente[]
+  richieste      Richiesta[]
+
+  @@map("utenti")
+}
+
+model NotaUtente {
+  id        String   @id @default(uuid())
+  nota      String
+  idUtente  String   @map("id_utente")
+  createdAt DateTime @default(now()) @map("created_at")
+  utente    Utente   @relation(fields: [idUtente], references: [id], onDelete: Cascade)
+
+  @@map("note_utente")
+}
+
+model Richiesta {
+  id                     String    @id @default(uuid())
+  tipoRichiesta          Int       @map("tipo_richiesta")
+  noteRichiesta          String    @map("note_richiesta")
+  importo                Float
+  statoRichiesta         String    @map("stato_richiesta")
+  dataConsegnaPrevista   String    @map("data_consegna_prevista")
+  dataConsegnaEffettiva  String?   @map("data_consegna_effettiva")
+  noteSuConsegna         String?   @map("note_su_consegna")
+  idOperatoreResponsabile String    @map("id_operatore_responsabile")
+  idUtente               String    @map("id_utente")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  operatore              Operatore @relation(fields: [idOperatoreResponsabile], references: [id], onDelete: Cascade)
+  utente                 Utente    @relation(fields: [idUtente], references: [id], onDelete: Cascade)
+
+  @@map("richieste")
+}
+
+enum Role {
+  ADMIN
+  AMMINISTRATORE
+  RESPONSABILE
+  OPERATORE
+}
